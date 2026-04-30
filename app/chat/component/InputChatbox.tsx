@@ -12,12 +12,14 @@ type Message = {
 type InputChatboxProps = {
   id: string | number;
   name?: string;
+  placeholder?: string;
   onSendMessage: (text: string, file?: File) => void;
 };
 
 export default function InputChatbox({
   id,
   name,
+  placeholder,
   onSendMessage,
 }: InputChatboxProps) {
   {
@@ -112,7 +114,7 @@ export default function InputChatbox({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder={"Demandez quelque chose à " + name + "..."}
+              placeholder={placeholder ?? "Demandez quelque chose à " + name + "..."}
               className="flex-1 bg-transparent outline-none text-sm py-2 text-gray-800 dark:text-gray-200"
             />
 
