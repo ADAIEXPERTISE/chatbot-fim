@@ -16,32 +16,16 @@ export type GuidedQuestion = {
 export const guidedQuestions: GuidedQuestion[] = [
   {
     questionId: 1,
-    question: "Qu'est-ce qui vous intéresse à la FIM ?",
-    type: "text",
-  },
-  {
-    questionId: 2,
-    question: "Combien de temps pensez-vous rester à la FIM ?",
+    question: "Qu'est-ce qui vous intéresse ?",
     type: "choice",
     choices: [
-      { choiceId: 1, label: "Moins d'1h", value: "less_than_1h" },
-      { choiceId: 2, label: "2h", value: "2h" },
-      { choiceId: 3, label: "2h et plus", value: "2h_or_more" },
-      { choiceId: 4, label: "Toute la journée", value: "all_day" },
-    ],
-  },
-  {
-    questionId: 3,
-    question: "Que souhaitez-vous faire maintenant ?",
-    type: "choice",
-    choices: [
-      {
-        choiceId: 5,
-        label: "Commencer la visite des stands",
-        value: "start_visit",
-      },
-      { choiceId: 6, label: "Voir d'autres stands", value: "explore_more" },
-      { choiceId: 7, label: "Terminer la visite guidée", value: "end_guide" },
+      { choiceId: 1, label: "Exposant", value: "exhibitor" },
+      { choiceId: 2, label: "Sponsors", value: "sponsors" },
+      { choiceId: 3, label: "Conférence", value: "Conférence" },
+      { choiceId: 4, label: "Table ronde", value: "Table ronde" },
+      { choiceId: 5, label: "Atelier", value: "Atelier" },
+      { choiceId: 6, label: "Speed recruiting", value: "Speed recruiting" },
+      { choiceId: 7, label: "Informations diverses", value: "Informations diverses" },
     ],
   },
 ];

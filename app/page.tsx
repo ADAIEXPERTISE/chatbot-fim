@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import InputChatbox from "./chat/component/InputChatbox";
 import HeaderChatBox from "./chat/component/HeaderChatbox";
 import TypingBubble from "./chat/component/TypingBubble";
 import ChoiceButtons from "./chat/component/ChoiceButtons";
-import RecommendationBubble from "./chat/component/RecommendationBubble";
-import { guidedQuestions, QuestionChoice } from "./chat/data/questions";
+import { guidedQuestions, QuestionChoice, GuidedQuestion } from "./chat/data/questions";
 
 type Message = {
   id: number;
@@ -21,6 +21,26 @@ type Stand = {
   posX: number;
   posY: number;
   status: string;
+  zoneName?: string;
+};
+
+type ExhibitorWithStands = {
+  exhibitorId: number;
+  exhibitorName: string;
+  stands: Stand[];
+};
+
+type EventItem = {
+  eventId: string;
+  eventDate: string;
+  dayLabel: string;
+  eventType: string;
+  title: string;
+  venueName: string;
+  startTime: string;
+  endTime: string;
+  organizerOrBrand: string;
+  targetAudience: string;
 };
 
 type Answer = {
@@ -53,14 +73,109 @@ export default function ChatBox() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [isGuided, setIsGuided] = useState(true);
-  const [recommendations, setRecommendations] = useState<Stand[]>([]);
+  const [selectedMainTopic, setSelectedMainTopic] = useState<string | null>(null);
+  const [keywordChoices, setKeywordChoices] = useState<QuestionChoice[] | null>(null);
+  const [showKeywordQuestion, setShowKeywordQuestion] = useState(false);
+  const [exhibitorChoices, setExhibitorChoices] = useState<QuestionChoice[] | null>(null);
+  const [showExhibitorQuestion, setShowExhibitorQuestion] = useState(false);
+  const [exhibitorsList, setExhibitorsList] = useState<Stand[]>([]);
+  const [selectedExhibitorForModal, setSelectedExhibitorForModal] = useState<Stand | ExhibitorWithStands | null>(null);
+  const [showExhibitorModal, setShowExhibitorModal] = useState(false);
+  const [sponsorChoices, setSponsorChoices] = useState<QuestionChoice[] | null>(null);
+  const [showSponsorQuestion, setShowSponsorQuestion] = useState(false);
+  const [sponsorsList, setSponsorsList] = useState<Stand[]>([]);
+  const [infoChoices, setInfoChoices] = useState<QuestionChoice[] | null>(null);
+  const [showInfoQuestion, setShowInfoQuestion] = useState(false);
+  const [conferenceChoices, setConferenceChoices] = useState<QuestionChoice[] | null>(null);
+  const [showConferenceQuestion, setShowConferenceQuestion] = useState(false);
+  const [conferencesList, setConferencesList] = useState<Array<{ eventId: string; title: string; startTime: string; endTime: string; venueName: string; eventDate: string; organizerOrBrand: string }>>([]);
+  const [foodCourtChoices, setFoodCourtChoices] = useState<QuestionChoice[] | null>(null);
+  const [showFoodCourtQuestion, setShowFoodCourtQuestion] = useState(false);
+  const [foodCourtList, setFoodCourtList] = useState<Stand[]>([]);
+  const [showExhibitorMapModal, setShowExhibitorMapModal] = useState(false);
+  const [showContinueChoiceModal, setShowContinueChoiceModal] = useState(false);
+  const eventDate = new Date().toISOString().split('T')[0];
+  const messageIdRef = useRef(2);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const currentQuestion = guidedQuestions[currentQuestionIndex];
+  const generateMessageId = (): number => {
+    messageIdRef.current += 1;
+    return messageIdRef.current;
+  };
+
+  const formatFrenchDate = (dateString: string) => {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return dateString;
+    return new Intl.DateTimeFormat("fr-FR", {
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }).format(date);
+  };
+
+  const keywordQuestion: GuidedQuestion | null = showKeywordQuestion
+    ? {
+        questionId: 100,
+        question: "Quel domaine vous intéresse ?",
+        type: "choice",
+        choices: keywordChoices || [],
+      }
+    : null;
+
+  const exhibitorQuestion: GuidedQuestion | null = showExhibitorQuestion
+    ? {
+        questionId: 101,
+        question: "Choisissez un exposant :",
+        type: "choice",
+        choices: exhibitorChoices || [],
+      }
+    : null;
+
+  const sponsorQuestion: GuidedQuestion | null = showSponsorQuestion
+    ? {
+        questionId: 103,
+        question: "Choisissez un sponsor :",
+        type: "choice",
+        choices: sponsorChoices || [],
+      }
+    : null;
+
+  const infoQuestion: GuidedQuestion | null = showInfoQuestion
+    ? {
+        questionId: 104,
+        question: "Informations diverses :",
+        type: "choice",
+        choices: infoChoices || [],
+      }
+    : null;
+
+  const conferenceQuestion: GuidedQuestion | null = showConferenceQuestion
+    ? {
+        questionId: 102,
+        question: "Choisissez une conférence :",
+        type: "choice",
+        choices: conferenceChoices || [],
+      }
+    : null;
+
+  const foodCourtQuestion: GuidedQuestion | null = showFoodCourtQuestion
+    ? {
+        questionId: 105,
+        question: "Choisissez un restaurant :",
+        type: "choice",
+        choices: foodCourtChoices || [],
+      }
+    : null;
+
+  const currentQuestion = foodCourtQuestion ?? conferenceQuestion ?? exhibitorQuestion ?? sponsorQuestion ?? infoQuestion ?? keywordQuestion ?? guidedQuestions[currentQuestionIndex];
 
   const goToSatisfactionSurvey = () => {
     // Rediriger vers la page de satisfaction
     window.location.href = "/satisfaction";
   };
+
+  const router = useRouter();
 
   const isEndOfVisitMessage = (message: string) => {
     const normalized = message.toLowerCase();
@@ -75,6 +190,404 @@ export default function ChatBox() {
       "j'ai terminé la visite",
       "j'ai fini la visite",
     ].some((term) => normalized.includes(term));
+  };
+
+  const fetchSponsors = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/sponsors");
+      const data = await res.json();
+      const sponsorStands: Stand[] = Array.isArray(data.exhibitors)
+        ? data.exhibitors.flatMap((exhibitor: any) =>
+            exhibitor.stands?.map((stand: any) => ({
+              standCode: stand.standCode,
+              exhibitorId: exhibitor.exhibitorId,
+              exhibitorName: exhibitor.exhibitorName,
+              posX: stand.position?.x || 0,
+              posY: stand.position?.y || 0,
+              status: stand.status || "confirmed",
+            })) || []
+          )
+        : [];
+
+      const sponsorMap = new Map<number, Stand>();
+      sponsorStands.forEach((stand) => {
+        if (!sponsorMap.has(stand.exhibitorId)) {
+          sponsorMap.set(stand.exhibitorId, stand);
+        }
+      });
+
+      const uniqueSponsorStands = Array.from(sponsorMap.values());
+      const sponsorNames = uniqueSponsorStands.map((sponsor) => sponsor.exhibitorName || "Sponsor inconnu");
+
+      if (uniqueSponsorStands.length === 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Aucun sponsor trouvé pour le moment. Essayez une autre option.",
+            sender: "bot",
+          },
+        ]);
+      } else {
+        setSponsorsList(uniqueSponsorStands);
+        setSponsorChoices(
+          uniqueSponsorStands.map((sponsor, index) => ({
+            choiceId: index,
+            label: sponsor.exhibitorName || `Sponsor ${index + 1}`,
+            value: String(sponsor.exhibitorId),
+          })),
+        );
+        setShowSponsorQuestion(true);
+        setIsGuided(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Voici la liste des sponsors présents à la FIM :",
+            sender: "bot",
+          },
+          {
+            id: generateMessageId(),
+            text: sponsorNames.join("\n"),
+            sender: "bot",
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des sponsors :", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: "Impossible de récupérer les sponsors pour le moment.",
+          sender: "bot",
+        },
+      ]);
+      setIsGuided(false);
+    } finally {
+      setIsLoading(false);
+      setCurrentQuestionIndex(0);
+    }
+  };
+
+  const fetchEventsByType = async (eventType: string, label: string) => {
+    setIsLoading(true);
+    setConferenceChoices(null);
+    setShowConferenceQuestion(false);
+    try {
+      const queryString = new URLSearchParams({
+        type: eventType,
+        date: eventDate,
+      }).toString();
+      const res = await fetch(`/api/events?${queryString}`);
+      const data = await res.json();
+      const events: EventItem[] = Array.isArray(data.events) ? data.events : [];
+
+      if (events.length === 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: `Aucun événement de type ${label} n'a été trouvé pour le moment.`,
+            sender: "bot",
+          },
+        ]);
+        setIsGuided(false);
+      } else {
+        const normalizedEvents = events.map((event) => ({
+          eventId: event.eventId,
+          title: event.title,
+          eventDate: event.eventDate,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          venueName: event.venueName,
+          organizerOrBrand: event.organizerOrBrand || "",
+        }));
+
+        setConferencesList(normalizedEvents);
+        setConferenceChoices(
+          normalizedEvents.map((event, index) => ({
+            choiceId: index,
+            label: event.title,
+            value: event.eventId,
+          })),
+        );
+        setShowConferenceQuestion(true);
+        setIsGuided(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: `Voici les événements de type ${label} :`,
+            sender: "bot",
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des événements :", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: "Impossible de récupérer les événements pour le moment.",
+          sender: "bot",
+        },
+      ]);
+      setIsGuided(false);
+    } finally {
+      setIsLoading(false);
+      setCurrentQuestionIndex(0);
+    }
+  };
+
+  const fetchKeywords = async () => {
+    setIsLoading(true);
+    setExhibitorsList([]);
+    setExhibitorChoices(null);
+    setShowExhibitorQuestion(false);
+    setConferenceChoices(null);
+    setShowConferenceQuestion(false);
+    try {
+      const res = await fetch("/api/keywords");
+      const data = await res.json();
+      const choices: QuestionChoice[] = Array.isArray(data.keywords)
+        ? data.keywords.map((keyword: any, index: number) => ({
+            choiceId: keyword.keyword_id || index,
+            label: keyword.keyword_name,
+            value: String(keyword.keyword_id),
+          }))
+        : [];
+
+      if (choices.length === 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Aucun domaine n'a été trouvé pour les exposants.",
+            sender: "bot",
+          },
+        ]);
+        setIsGuided(false);
+      } else {
+        setKeywordChoices(choices);
+        setShowKeywordQuestion(true);
+        setIsGuided(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Quel domaine vous intéresse ?",
+            sender: "bot",
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des domaines :", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: "Impossible de charger la liste des domaines pour les exposants.",
+          sender: "bot",
+        },
+      ]);
+      setIsGuided(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchExhibitorsByKeyword = async (keywordId: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/exhibitors?keywordId=${encodeURIComponent(keywordId)}`);
+      const data = await res.json();
+      const exhibitors: Array<{ exhibitor_id: number; exhibitor_name: string; stand_code?: string; pos_x?: number; pos_y?: number; status?: string; zone_name?: string }> =
+        Array.isArray(data.exhibitors)
+          ? data.exhibitors
+          : [];
+      const normalizedExhibitors = exhibitors.map((exhibitor) => ({
+        standCode: exhibitor.stand_code || "",
+        exhibitorId: exhibitor.exhibitor_id,
+        exhibitorName: exhibitor.exhibitor_name,
+        posX: exhibitor.pos_x ?? 0,
+        posY: exhibitor.pos_y ?? 0,
+        status: exhibitor.status || "confirmed",
+        zoneName: exhibitor.zone_name || "",
+      }));
+
+      if (normalizedExhibitors.length === 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Aucun exposant trouvé pour ce domaine.",
+            sender: "bot",
+          },
+        ]);
+        setIsGuided(false);
+        setShowKeywordQuestion(false);
+        setKeywordChoices(null);
+        setSelectedMainTopic(null);
+      } else {
+        setExhibitorsList(normalizedExhibitors);
+        setExhibitorChoices(
+          normalizedExhibitors.map((exhibitor, index) => ({
+            choiceId: index,
+            label: exhibitor.exhibitorName,
+            value: String(exhibitor.exhibitorId),
+          })),
+        );
+        setShowExhibitorQuestion(true);
+        setIsGuided(true);
+        setShowKeywordQuestion(false);
+        setKeywordChoices(null);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Voici les exposants correspondant à ce domaine :",
+            sender: "bot",
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des exposants :", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: "Impossible de récupérer les exposants pour le moment.",
+          sender: "bot",
+        },
+      ]);
+      setIsGuided(false);
+    } finally {
+      setIsLoading(false);
+      setCurrentQuestionIndex(0);
+    }
+  };
+
+  const fetchExhibitorDetails = async (exhibitorId: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/exhibitors?exhibitorId=${encodeURIComponent(exhibitorId)}`);
+      const data = await res.json();
+      const stands: Array<{ exhibitor_id: number; exhibitor_name: string; stand_code?: string; pos_x?: number; pos_y?: number; status?: string; zone_name?: string }> =
+        Array.isArray(data.exhibitors)
+          ? data.exhibitors
+          : [];
+
+      if (stands.length === 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Aucun stand trouvé pour cet exposant.",
+            sender: "bot",
+          },
+        ]);
+        setIsGuided(false);
+      } else {
+        // Créer un objet avec l'exposant et tous ses stands
+        const exhibitorWithStands = {
+          exhibitorId: stands[0].exhibitor_id,
+          exhibitorName: stands[0].exhibitor_name,
+          stands: stands.map((stand) => ({
+            standCode: stand.stand_code || "",
+            posX: stand.pos_x ?? 0,
+            posY: stand.pos_y ?? 0,
+            status: stand.status || "confirmed",
+            zoneName: stand.zone_name || "",
+          })),
+        };
+
+        setSelectedExhibitorForModal(exhibitorWithStands);
+        setShowExhibitorModal(true);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des détails de l'exposant :", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: "Impossible de récupérer les détails de l'exposant.",
+          sender: "bot",
+        },
+      ]);
+      setIsGuided(false);
+    } finally {
+      setIsLoading(false);
+      setCurrentQuestionIndex(0);
+    }
+  };
+
+  const fetchFoodCourtExhibitors = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/exhibitors?keywordIds=4,3`);
+      const data = await res.json();
+      const exhibitors: Array<{ exhibitor_id: number; exhibitor_name: string; stand_code?: string; pos_x?: number; pos_y?: number; status?: string; zone_name?: string }> =
+        Array.isArray(data.exhibitors)
+          ? data.exhibitors
+          : [];
+      const normalizedExhibitors = exhibitors.map((exhibitor) => ({
+        standCode: exhibitor.stand_code || "",
+        exhibitorId: exhibitor.exhibitor_id,
+        exhibitorName: exhibitor.exhibitor_name,
+        posX: exhibitor.pos_x ?? 0,
+        posY: exhibitor.pos_y ?? 0,
+        status: exhibitor.status || "confirmed",
+        zoneName: exhibitor.zone_name || "",
+      }));
+
+      if (normalizedExhibitors.length === 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Aucun restaurant trouvé dans le food court pour le moment.",
+            sender: "bot",
+          },
+        ]);
+        setIsGuided(false);
+      } else {
+        setFoodCourtList(normalizedExhibitors);
+        setFoodCourtChoices(
+          normalizedExhibitors.map((exhibitor, index) => ({
+            choiceId: index,
+            label: exhibitor.exhibitorName,
+            value: String(exhibitor.exhibitorId),
+          })),
+        );
+        setShowFoodCourtQuestion(true);
+        setShowInfoQuestion(false);
+        setIsGuided(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Voici les restaurants disponibles dans le food court :",
+            sender: "bot",
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des restaurants :", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: "Impossible de récupérer les restaurants pour le moment.",
+          sender: "bot",
+        },
+      ]);
+      setIsGuided(false);
+    } finally {
+      setIsLoading(false);
+      setCurrentQuestionIndex(0);
+    }
   };
 
   // prends en charge les messages
@@ -92,31 +605,70 @@ export default function ChatBox() {
   ]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({
-        behavior: "smooth",
-      });
-    }, 50);
+    if (showExhibitorMapModal && canvasRef.current && selectedExhibitorForModal) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    return () => clearTimeout(timeout);
-  }, [messages]);
+      const img = new Image();
+      img.src = '/plan/plan.png';
+      img.onload = () => {
+        // Redimensionner le canvas à la taille de l'image
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        // Dessiner l'image
+        ctx.drawImage(img, 0, 0);
+
+        // Dessiner les marqueurs pour tous les stands
+        const standsToDraw = 'stands' in selectedExhibitorForModal
+          ? selectedExhibitorForModal.stands
+          : [selectedExhibitorForModal];
+
+        standsToDraw.forEach((stand, index) => {
+          const posX = stand.posX ?? 0;
+          const posY = stand.posY ?? 0;
+
+          // Cercle rouge plus grand avec contour
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(posX, posY, 50, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Contour blanc
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(posX, posY, 50, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Texte avec le code du stand
+          ctx.fillStyle = '#000000';
+          ctx.font = '14px Arial';
+          const label = stand.standCode || `Stand ${index + 1}`;
+          ctx.fillText(label, posX + 18, posY - 8);
+        });
+      };
+    }
+  }, [showExhibitorMapModal, selectedExhibitorForModal]);
+
 
   const handleSendMessage = async (text: string, file?: File) => {
     if (!text.trim() && !file) return;
 
     if (!isGuided && isEndOfVisitMessage(text)) {
       const userMsg: Message = {
-        id: Date.now(),
+        id: generateMessageId(),
         text,
         sender: "user",
       };
       setMessages((prev) => [...prev, userMsg]);
-      
+
       setTimeout(() => {
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now() + 1,
+            id: generateMessageId(),
             text: "Merci de votre visite ! Nous vous redirigeons vers le questionnaire de satisfaction.",
             sender: "bot",
           },
@@ -131,106 +683,30 @@ export default function ChatBox() {
 
     if (isGuided && currentQuestion) {
       const userMsg: Message = {
-        id: Date.now(),
+        id: generateMessageId(),
         text,
         sender: "user",
       };
 
       setMessages((prev) => [...prev, userMsg]);
 
-      // Upsert la réponse (utile si on redemande les centres d'intérêt)
+      if (currentQuestion.type === "choice") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Merci de choisir une option parmi les boutons ci-dessous.",
+            sender: "bot",
+          },
+        ]);
+        return;
+      }
+
       const newAnswers = [
         ...answers.filter((a) => a.questionId !== currentQuestion.questionId),
         { questionId: currentQuestion.questionId, response: text },
       ];
       setAnswers(newAnswers);
-
-      // Si c'est la première question (centres d'intérêt), récupérer les recommandations
-      if (currentQuestion.questionId === 1) {
-        setIsLoading(true);
-        try {
-          const res = await fetch("/api/recommendations", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ interests: text }),
-          });
-
-          const data = await res.json();
-          const fetchedRecs: Stand[] = Array.isArray(data.recommendations)
-            ? data.recommendations.flatMap((rec: any) => 
-                rec.stands?.map((stand: any) => ({
-                  standCode: stand.standCode,
-                  exhibitorId: rec.exhibitorId,
-                  exhibitorName: rec.exhibitorName,
-                  posX: stand.position?.x || 0,
-                  posY: stand.position?.y || 0,
-                  status: stand.status || 'confirmed',
-                })) || []
-              )
-            : [];
-
-          // Si on ne trouve rien, ne pas enchaîner sur le temps : redemander les centres d'intérêt
-          if (fetchedRecs.length === 0) {
-            setRecommendations([]);
-            setTimeout(() => {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: Date.now() + 1,
-                  text:
-                    "Je n'ai pas trouvé de stands correspondant. Pouvez-vous préciser ce que vous voulez voir à la FIM ? Quels sont vos centres d'intérêt ?",
-                  sender: "bot",
-                },
-              ]);
-            }, 300);
-
-            setCurrentQuestionIndex(0);
-            return;
-          }
-
-          setRecommendations(fetchedRecs);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: Date.now() + 1,
-              text: "recommendations",
-              sender: "bot",
-            },
-          ]);
-        } catch (error) {
-          console.error("Error fetching recommendations:", error);
-          setTimeout(() => {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: Date.now() + 1,
-                text:
-                  "Je n'arrive pas à récupérer les recommandations pour le moment. Pouvez-vous redire vos centres d'intérêt ?",
-                sender: "bot",
-              },
-            ]);
-          }, 300);
-
-          setCurrentQuestionIndex(0);
-          return;
-        } finally {
-          setIsLoading(false);
-        }
-
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: Date.now() + 2,
-              text: guidedQuestions[1].question,
-              sender: "bot",
-            },
-          ]);
-        }, 500);
-
-        setCurrentQuestionIndex(1);
-        return;
-      }
 
       const nextIndex = currentQuestionIndex + 1;
       if (nextIndex < guidedQuestions.length) {
@@ -239,7 +715,7 @@ export default function ChatBox() {
           setMessages((prev) => [
             ...prev,
             {
-              id: Date.now() + 1,
+              id: generateMessageId(),
               text: guidedQuestions[nextIndex].question,
               sender: "bot",
             },
@@ -251,8 +727,8 @@ export default function ChatBox() {
           setMessages((prev) => [
             ...prev,
             {
-              id: Date.now() + 1,
-              text: "Merci ! Je garde vos centres d'intérêt en mémoire. Vous pouvez maintenant discuter librement avec moi ou me demander des stands à visiter.",
+              id: generateMessageId(),
+              text: "Merci ! Vous pouvez maintenant discuter librement avec moi ou me demander des stands à visiter.",
               sender: "bot",
             },
           ]);
@@ -262,16 +738,14 @@ export default function ChatBox() {
     }
 
     const userMsg: Message = {
-      id: Date.now(),
+      id: generateMessageId(),
       text,
       sender: "user",
     };
 
     setMessages((prev) => [...prev, userMsg]);
 
-    // 👉 ADD LOADING MESSAGE
-    const loadingId = Date.now() + 1;
-
+    const loadingId = generateMessageId();
     setMessages((prev) => [
       ...prev,
       {
@@ -299,11 +773,9 @@ export default function ChatBox() {
       });
 
       const data = await res.json();
-
       const fullText = data.reply || "No response from bot";
       let index = 0;
 
-      // replace loading bubble with empty bot message
       setMessages((prev) =>
         prev.map((msg) => (msg.id === loadingId ? { ...msg, text: "" } : msg)),
       );
@@ -323,10 +795,8 @@ export default function ChatBox() {
           clearInterval(interval);
           setIsLoading(false);
 
-          // Si des recommandations sont incluses dans la réponse, les afficher
           if (data.stands && data.stands.length > 0) {
             setTimeout(() => {
-              // Convertir les stands du nouveau format vers l'ancien format attendu
               const convertedStands: Stand[] = data.stands.map((stand: any) => ({
                 standCode: stand.standCode || 'N/A',
                 exhibitorId: 0,
@@ -336,29 +806,7 @@ export default function ChatBox() {
                 status: "confirmed",
               }));
 
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: Date.now() + 1,
-                  text: "recommendations",
-                  sender: "bot",
-                },
-              ]);
-              setRecommendations(convertedStands);
-
-              // Après avoir affiché les recommandations, poser la question suivante
-              setTimeout(() => {
-                setIsGuided(true);
-                setCurrentQuestionIndex(2); // Question "Que souhaitez-vous faire maintenant ?"
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    id: Date.now() + 2,
-                    text: guidedQuestions[2].question,
-                    sender: "bot",
-                  },
-                ]);
-              }, 2000); // Attendre 2 secondes après l'affichage des recommandations
+              // TODO: Afficher les stands dans le modal ou d'une autre manière
             }, 500);
           }
         }
@@ -374,16 +822,99 @@ export default function ChatBox() {
             : msg,
         ),
       );
-
       setIsLoading(false);
     }
   };
+  const handleGoBack = () => {
+    if (showConferenceQuestion) {
+      setShowConferenceQuestion(false);
+      setConferenceChoices(null);
+      setConferencesList([]);
+      setCurrentQuestionIndex(0);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: guidedQuestions[0].question,
+          sender: "bot",
+        },
+      ]);
+    } else if (showExhibitorQuestion) {
+      setShowExhibitorQuestion(false);
+      setExhibitorChoices(null);
+      setExhibitorsList([]);
+      setShowKeywordQuestion(true);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: "Quel domaine vous intéresse ?",
+          sender: "bot",
+        },
+      ]);
+    } else if (showSponsorQuestion) {
+      setShowSponsorQuestion(false);
+      setSponsorChoices(null);
+      setSponsorsList([]);
+      setSelectedMainTopic(null);
+      setCurrentQuestionIndex(0);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: guidedQuestions[0].question,
+          sender: "bot",
+        },
+      ]);
+    } else if (showInfoQuestion) {
+      setShowInfoQuestion(false);
+      setInfoChoices(null);
+      setSelectedMainTopic(null);
+      setCurrentQuestionIndex(0);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: guidedQuestions[0].question,
+          sender: "bot",
+        },
+      ]);
+    } else if (showFoodCourtQuestion) {
+      setShowFoodCourtQuestion(false);
+      setFoodCourtChoices(null);
+      setFoodCourtList([]);
+      setShowInfoQuestion(true);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: "Choisissez une information :",
+          sender: "bot",
+        },
+      ]);
+    } else if (showKeywordQuestion) {
+      setShowKeywordQuestion(false);
+      setKeywordChoices(null);
+      setSelectedMainTopic(null);
+      setCurrentQuestionIndex(0);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          text: guidedQuestions[0].question,
+          sender: "bot",
+        },
+      ]);
+    }
+  };
 
-  const handleChooseOption = (choice: QuestionChoice) => {
+  const canGoBack = showExhibitorQuestion || showKeywordQuestion || showConferenceQuestion || showSponsorQuestion || showInfoQuestion || showFoodCourtQuestion;
+
+  const handleChooseOption = async (choice: QuestionChoice) => {
     if (!currentQuestion) return;
 
     const userMsg: Message = {
-      id: Date.now(),
+      id: generateMessageId(),
       text: choice.label,
       sender: "user",
     };
@@ -400,56 +931,161 @@ export default function ChatBox() {
     ];
     setAnswers(newAnswers);
 
-    // Si c'est la dernière question (question 3), traiter selon le choix
-    if (currentQuestion.questionId === 3) {
-      if (choice.value === "end_guide") {
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: Date.now() + 1,
-              text: "Merci de votre visite ! Nous vous redirigeons vers le questionnaire de satisfaction.",
-              sender: "bot",
-            },
-          ]);
-        }, 300);
-        
-        setTimeout(() => {
-          goToSatisfactionSurvey();
-        }, 1500);
-        return;
-      } else if (choice.value === "explore_more") {
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: Date.now() + 1,
-              text: "Dites-moi ce qui vous intéresse et je vous proposerai d'autres stands à découvrir !",
-              sender: "bot",
-            },
-          ]);
-        }, 300);
-        setIsGuided(false);
-        return;
-      } else if (choice.value === "start_visit") {
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: Date.now() + 1,
-              text: `Parfait ! Basé sur vos intérêts, voici les stands recommandés à visiter en ${newAnswers.find((a) => a.questionId === 2)?.response || "ce temps"}. Cliquez sur un stand pour voir sa localisation sur la carte.`,
-              sender: "bot",
-            },
-            {
-              id: Date.now() + 2,
-              text: "recommendations",
-              sender: "bot",
-            },
-          ]);
-        }, 300);
-        setIsGuided(false);
+    if (currentQuestion.questionId === 1) {
+      setSelectedMainTopic(choice.value);
+      if (choice.value === "exhibitor") {
+        await fetchKeywords();
         return;
       }
+
+      if (choice.value === "sponsors") {
+        await fetchSponsors();
+        return;
+      }
+
+      if (choice.value === "Informations diverses") {
+        const infoOptions: QuestionChoice[] = [
+          { choiceId: 1, label: "FAQ", value: "faq" },
+          { choiceId: 2, label: "Billeterie", value: "billeterie" },
+          { choiceId: 3, label: "Food court", value: "foodcourt" },
+          { choiceId: 4, label: "Où est l'organisateur", value: "organisateur" },
+        ];
+        setInfoChoices(infoOptions);
+        setShowInfoQuestion(true);
+        setShowKeywordQuestion(false);
+        setShowExhibitorQuestion(false);
+        setShowSponsorQuestion(false);
+        setShowConferenceQuestion(false);
+        setIsGuided(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Choisissez une information :",
+            sender: "bot",
+          },
+          {
+            id: generateMessageId(),
+            text: infoOptions.map((option) => option.label).join("\n"),
+            sender: "bot",
+          },
+        ]);
+        return;
+      }
+
+      if (
+        choice.value === "Conférence" ||
+        choice.value === "Table ronde" ||
+        choice.value === "Atelier" ||
+        choice.value === "Speed recruiting"
+      ) {
+        await fetchEventsByType(choice.value, choice.label);
+        return;
+      }
+    }
+
+    if (currentQuestion.questionId === 100 && selectedMainTopic === "exhibitor") {
+      await fetchExhibitorsByKeyword(choice.value);
+      return;
+    }
+
+    if (currentQuestion.questionId === 101 && selectedMainTopic === "exhibitor") {
+      await fetchExhibitorDetails(choice.value);
+      return;
+    }
+
+    if (currentQuestion.questionId === 103) {
+      const selectedSponsor = sponsorsList.find(
+        (s) => String(s.exhibitorId) === choice.value,
+      );
+
+      if (selectedSponsor) {
+        setSelectedExhibitorForModal({
+          exhibitorId: selectedSponsor.exhibitorId,
+          exhibitorName: selectedSponsor.exhibitorName || "Sponsor",
+          standCode: selectedSponsor.standCode || "",
+        });
+        setShowExhibitorModal(true);
+      }
+
+      return;
+    }
+
+    if (currentQuestion.questionId === 104) {
+      if (choice.value === "faq") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Redirection vers la page FAQ...",
+            sender: "bot",
+          },
+        ]);
+        router.push("/faq");
+        return;
+      }
+
+      if (choice.value === "billeterie") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Achetez vos billets à l'entrée ou sur le site Ticket place.",
+            sender: "bot",
+          },
+        ]);
+        return;
+      }
+
+      if (choice.value === "foodcourt") {
+        await fetchFoodCourtExhibitors();
+        return;
+      }
+
+      if (choice.value === "organisateur") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: "Où est l'organisateur : le bureau organisateur se trouve à l'accueil principal.",
+            sender: "bot",
+          },
+        ]);
+        return;
+      }
+    }
+
+    if (currentQuestion.questionId === 105) {
+      const selectedFoodCourt = foodCourtList.find(
+        (f) => String(f.exhibitorId) === choice.value,
+      );
+
+      if (selectedFoodCourt) {
+        setSelectedExhibitorForModal(selectedFoodCourt);
+        setShowExhibitorModal(true);
+      }
+
+      return;
+    }
+
+    if (currentQuestion.questionId === 102) {
+      const selectedConference = conferencesList.find(
+        (e) => e.eventId === choice.value,
+      );
+
+      if (selectedConference) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: `Détails de l'événement :\n${selectedConference.title}\nDate : ${formatFrenchDate(selectedConference.eventDate)}\nHeure : ${selectedConference.startTime} - ${selectedConference.endTime}\nLieu : ${selectedConference.venueName}\nOrganisateur : ${selectedConference.organizerOrBrand}`,
+            sender: "bot",
+          },
+        ]);
+      }
+
+      // Conserver la liste des événements affichée et ne pas repasser en input libre.
+      return;
     }
 
     const nextIndex = currentQuestionIndex + 1;
@@ -459,7 +1095,7 @@ export default function ChatBox() {
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now() + 1,
+            id: generateMessageId(),
             text: guidedQuestions[nextIndex].question,
             sender: "bot",
           },
@@ -471,8 +1107,8 @@ export default function ChatBox() {
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now() + 1,
-            text: "Merci ! Je garde vos centres d'intérêt en mémoire. Vous pouvez maintenant discuter librement avec moi ou me demander des stands à visiter.",
+            id: generateMessageId(),
+            text: "Merci ! Vous pouvez maintenant poser une nouvelle question ou recommencer le choix.",
             sender: "bot",
           },
         ]);
@@ -480,11 +1116,29 @@ export default function ChatBox() {
     }
   };
 
-  const handleSelectStand = (stand: Stand) => {
-    console.log("Stand sélectionné:", stand);
+  const handleShowExhibitorOnMap = () => {
+    setShowExhibitorModal(false);
+    setShowExhibitorMapModal(true);
+  };
 
-    // TODO: Naviguer vers la carte avec le stand sélectionné
-    // Pour l'instant, on ne déclenche pas le mode guidé
+  const handleCloseExhibitorModal = () => {
+    setShowExhibitorModal(false);
+    setSelectedExhibitorForModal(null);
+  };
+
+  const handleCloseExhibitorMapModal = () => {
+    setShowExhibitorMapModal(false);
+    setShowContinueChoiceModal(true);
+  };
+
+  const handleContinueVisit = () => {
+    setShowContinueChoiceModal(false);
+    setSelectedExhibitorForModal(null);
+  };
+
+  const handleFinishVisit = () => {
+    setShowContinueChoiceModal(false);
+    window.location.href = "/satisfaction";
   };
 
   const typeMessage = (text: string, messageId: number) => {
@@ -528,11 +1182,6 @@ export default function ChatBox() {
                 <div className="max-w-[80%] rounded-2xl px-4 py-2 text-sm bg-gray-200 text-gray-800 rounded-bl-none">
                   <TypingBubble />
                 </div>
-              ) : msg.text === "recommendations" ? (
-                <RecommendationBubble
-                  stands={recommendations}
-                  onSelectStand={handleSelectStand}
-                />
               ) : (
                 <div
                   className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
@@ -551,24 +1200,155 @@ export default function ChatBox() {
         </div>
         {/* INPUT BOX */}
         {isGuided && currentQuestion?.type === "choice" && currentQuestion.choices ? (
-          <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 dark:bg-zinc-950">
+          <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 dark:bg-zinc-950 max-h-[50vh] overflow-y-auto">
+            {canGoBack && (
+              <button
+                onClick={handleGoBack}
+                className="mb-3 flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+              >
+                <span>←</span>
+                <span>Retour</span>
+              </button>
+            )}
             <ChoiceButtons choices={currentQuestion.choices} onChoose={handleChooseOption} />
           </div>
         ) : null}
 
-        <InputChatbox
-          id={currentAI ? currentAI.id : 0}
-          name={currentAI ? currentAI.name : "Robot"}
-          placeholder={
-            isGuided
-              ? currentQuestion?.type === "text"
-                ? currentQuestion.question
-                : "Choisissez une option ou écrivez votre réponse"
-              : "Demande-moi un stand ou pose-moi une question"
-          }
-          onSendMessage={handleSendMessage}
-        />
+        {(!isGuided || currentQuestion?.type === "text") && (
+          <InputChatbox
+            id={currentAI ? currentAI.id : 0}
+            name={currentAI ? currentAI.name : "Robot"}
+            placeholder={
+              isGuided
+                ? currentQuestion?.type === "text"
+                  ? currentQuestion.question
+                  : "Choisissez une option ci-dessus"
+                : "Demande-moi un stand ou pose-moi une question"
+            }
+            onSendMessage={handleSendMessage}
+          />
+        )}
       </main>
+
+      {/* EXHIBITOR MODAL */}
+      {showExhibitorModal && selectedExhibitorForModal && (
+        <div className="fixed inset-0 bg- bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900">Détails de l'exposant</h2>
+              <button
+                onClick={handleCloseExhibitorModal}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600">Nom de l'exposant</p>
+                <p className="text-base font-semibold text-gray-900">
+                  {'stands' in selectedExhibitorForModal ? selectedExhibitorForModal.exhibitorName : selectedExhibitorForModal.exhibitorName}
+                </p>
+              </div>
+
+              {'stands' in selectedExhibitorForModal ? (
+                // Afficher tous les stands de l'exposant
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Stands</p>
+                  <div className="max-h-72 overflow-auto space-y-2 pr-2">
+                    {selectedExhibitorForModal.stands.map((stand, index) => (
+                      <div key={index} className="rounded-lg border border-gray-200 p-3 bg-gray-50">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{stand.standCode}</p>
+                            {stand.zoneName && (
+                              <p className="text-xs text-gray-600">Zone: {stand.zoneName}</p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">{stand.status}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                // Afficher un seul stand (pour sponsors)
+                selectedExhibitorForModal.standCode && (
+                  <div>
+                    <p className="text-sm text-gray-600">Stand</p>
+                    <p className="text-base font-semibold text-gray-900">
+                      {selectedExhibitorForModal.standCode}
+                    </p>
+                  </div>
+                )
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleShowExhibitorOnMap}
+                  className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
+                >
+                  Voir sur la carte
+                </button>
+                <button
+                  onClick={handleCloseExhibitorModal}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showExhibitorMapModal && selectedExhibitorForModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white w-screen h-screen shadow-lg overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-bold text-gray-900">Plan du salon</h2>
+              <button
+                onClick={handleCloseExhibitorMapModal}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-50">
+              <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showContinueChoiceModal && (
+        <div className="fixed inset-0 bg-transparent bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-semibold text-gray-900">Que souhaitez-vous faire ?</h2>
+            <p className="mt-3 text-gray-600">
+              Voulez-vous continuer la visite
+            </p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <button
+                onClick={handleContinueVisit}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+              >
+                Continuer la visite
+              </button>
+              <button
+                onClick={handleFinishVisit}
+                className="rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 transition"
+              >
+                Terminer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
