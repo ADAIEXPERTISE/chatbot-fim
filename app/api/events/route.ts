@@ -5,7 +5,8 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const eventType = url.searchParams.get('type');
     // const eventDate = url.searchParams.get('date');
-    const eventDate = "2026-05-10"; // Date fixe pour les événements du 1er octobre 2024;
+    // const eventDate = "2026-05-10"; // Date fixe pour les événements du 1er octobre 2024;
+    const eventDate = url.searchParams.get('date'); // Date fixe pour les événements du 1er octobre 2024;
 
     if (!eventType) {
       return Response.json(
