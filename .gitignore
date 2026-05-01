@@ -41,5 +41,9 @@ next-env.d.ts
 .vercel
 
 /app/generated/prisma
+node_modules/
 .env
 .env.local
+.env*.local
+dist/
+.next/
