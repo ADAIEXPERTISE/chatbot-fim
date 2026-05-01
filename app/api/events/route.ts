@@ -30,7 +30,11 @@ export async function GET(req: Request) {
       params.push(eventDate);
     }
 
-    query += ` ORDER BY e.event_date, e.start_time`;
+    if (eventType === 'Atelier') {
+      query += ` ORDER BY e.organizer_or_brand, e.event_date, e.start_time`;
+    } else {
+      query += ` ORDER BY e.event_date, e.start_time`;
+    }
 
     let [rows] = await pool.execute(query, params);
     let events = (rows as any[]).map((event) => ({
@@ -54,8 +58,10 @@ export async function GET(req: Request) {
                            LEFT JOIN venue v ON e.venue_id = v.venue_id
                            WHERE e.event_type = ?
                              AND e.status <> 'annulé'
-                             AND DATE(e.event_date) >= CURDATE()
-                           ORDER BY e.event_date, e.start_time`;
+                             AND DATE(e.event_date) >= CURDATE()` +
+                          (eventType === 'Atelier'
+                            ? ` ORDER BY e.organizer_or_brand, e.event_date, e.start_time`
+                            : ` ORDER BY e.event_date, e.start_time`);
       const [fallbackRows] = await pool.execute(fallbackQuery, [eventType]);
       events = (fallbackRows as any[]).map((event) => ({
         eventId: event.event_id,
