@@ -88,6 +88,8 @@ export default function ChatBox() {
   const [showInfoQuestion, setShowInfoQuestion] = useState(false);
   const [conferenceChoices, setConferenceChoices] = useState<QuestionChoice[] | null>(null);
   const [showConferenceQuestion, setShowConferenceQuestion] = useState(false);
+  const [conferenceQuestionLabel, setConferenceQuestionLabel] = useState("Choisissez une conférence :");
+  const [selectedAtelierOrganizer, setSelectedAtelierOrganizer] = useState<string | null>(null);
   const [conferencesList, setConferencesList] = useState<Array<{ eventId: string; title: string; startTime: string; endTime: string; venueName: string; eventDate: string; organizerOrBrand: string }>>([]);
   const [foodCourtChoices, setFoodCourtChoices] = useState<QuestionChoice[] | null>(null);
   const [showFoodCourtQuestion, setShowFoodCourtQuestion] = useState(false);
@@ -153,7 +155,7 @@ export default function ChatBox() {
   const conferenceQuestion: GuidedQuestion | null = showConferenceQuestion
     ? {
         questionId: 102,
-        question: "Choisissez une conférence :",
+        question: conferenceQuestionLabel,
         type: "choice",
         choices: conferenceChoices || [],
       }
@@ -306,23 +308,50 @@ export default function ChatBox() {
         }));
 
         setConferencesList(normalizedEvents);
-        setConferenceChoices(
-          normalizedEvents.map((event, index) => ({
-            choiceId: index,
-            label: event.title,
-            value: event.eventId,
-          })),
-        );
-        setShowConferenceQuestion(true);
-        setIsGuided(true);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: generateMessageId(),
-            text: `Voici les événements de type ${label} :`,
-            sender: "bot",
-          },
-        ]);
+        if (eventType === "Atelier") {
+          const organizerNames = Array.from(
+            new Set(normalizedEvents.map((event) => event.organizerOrBrand).filter(Boolean)),
+          );
+          setConferenceChoices(
+            organizerNames.map((organizer, index) => ({
+              choiceId: index,
+              label: organizer,
+              value: organizer,
+            })),
+          );
+          setConferenceQuestionLabel("Choisissez un organisateur :");
+          setSelectedAtelierOrganizer(null);
+          setShowConferenceQuestion(true);
+          setIsGuided(true);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: generateMessageId(),
+              text: `Voici les organisateurs des ateliers :`,
+              sender: "bot",
+            },
+          ]);
+        } else {
+          setConferenceChoices(
+            normalizedEvents.map((event, index) => ({
+              choiceId: index,
+              label: event.title,
+              value: event.eventId,
+            })),
+          );
+          setConferenceQuestionLabel("Choisissez une conférence :");
+          setSelectedAtelierOrganizer(null);
+          setShowConferenceQuestion(true);
+          setIsGuided(true);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: generateMessageId(),
+              text: `Voici les événements de type ${label} :`,
+              sender: "bot",
+            },
+          ]);
+        }
       }
     } catch (error) {
       console.error("Erreur lors de la récupération des événements :", error);
@@ -1069,6 +1098,32 @@ export default function ChatBox() {
     }
 
     if (currentQuestion.questionId === 102) {
+      if (selectedMainTopic === "Atelier" && !selectedAtelierOrganizer) {
+        const organizer = choice.value;
+        setSelectedAtelierOrganizer(organizer);
+        const filteredEvents = conferencesList.filter(
+          (event) => event.organizerOrBrand === organizer,
+        );
+        setConferenceChoices(
+          filteredEvents.map((event, index) => ({
+            choiceId: index,
+            label: `${event.title} (${event.startTime})`,
+            value: event.eventId,
+          })),
+        );
+        setConferenceQuestionLabel("Choisissez un atelier :");
+        setShowConferenceQuestion(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: `Voici les ateliers de ${organizer} :`,
+            sender: "bot",
+          },
+        ]);
+        return;
+      }
+
       const selectedConference = conferencesList.find(
         (e) => e.eventId === choice.value,
       );
