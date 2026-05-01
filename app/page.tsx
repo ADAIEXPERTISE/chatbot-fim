@@ -90,6 +90,7 @@ export default function ChatBox() {
   const [showConferenceQuestion, setShowConferenceQuestion] = useState(false);
   const [conferenceQuestionLabel, setConferenceQuestionLabel] = useState("Choisissez une conférence :");
   const [selectedAtelierOrganizer, setSelectedAtelierOrganizer] = useState<string | null>(null);
+  const [selectedConferenceDate, setSelectedConferenceDate] = useState<string | null>(null);
   const [conferencesList, setConferencesList] = useState<Array<{ eventId: string; title: string; startTime: string; endTime: string; venueName: string; eventDate: string; organizerOrBrand: string }>>([]);
   const [foodCourtChoices, setFoodCourtChoices] = useState<QuestionChoice[] | null>(null);
   const [showFoodCourtQuestion, setShowFoodCourtQuestion] = useState(false);
@@ -321,6 +322,7 @@ export default function ChatBox() {
           );
           setConferenceQuestionLabel("Choisissez un organisateur :");
           setSelectedAtelierOrganizer(null);
+          setSelectedConferenceDate(null);
           setShowConferenceQuestion(true);
           setIsGuided(true);
           setMessages((prev) => [
@@ -328,6 +330,30 @@ export default function ChatBox() {
             {
               id: generateMessageId(),
               text: `Voici les organisateurs des ateliers :`,
+              sender: "bot",
+            },
+          ]);
+        } else if (eventType === "Conférence" || eventType === "Table ronde") {
+          const uniqueDates = Array.from(
+            new Set(normalizedEvents.map((event) => event.eventDate)),
+          ).sort();
+          setConferenceChoices(
+            uniqueDates.map((date, index) => ({
+              choiceId: index,
+              label: formatFrenchDate(date),
+              value: date,
+            })),
+          );
+          setConferenceQuestionLabel("Choisissez une date :");
+          setSelectedAtelierOrganizer(null);
+          setSelectedConferenceDate(null);
+          setShowConferenceQuestion(true);
+          setIsGuided(true);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: generateMessageId(),
+              text: `Voici les dates disponibles pour les ${label.toLowerCase()} :`,
               sender: "bot",
             },
           ]);
@@ -341,6 +367,7 @@ export default function ChatBox() {
           );
           setConferenceQuestionLabel("Choisissez une conférence :");
           setSelectedAtelierOrganizer(null);
+          setSelectedConferenceDate(null);
           setShowConferenceQuestion(true);
           setIsGuided(true);
           setMessages((prev) => [
@@ -859,6 +886,8 @@ export default function ChatBox() {
       setShowConferenceQuestion(false);
       setConferenceChoices(null);
       setConferencesList([]);
+      setSelectedAtelierOrganizer(null);
+      setSelectedConferenceDate(null);
       setCurrentQuestionIndex(0);
       setMessages((prev) => [
         ...prev,
@@ -1118,6 +1147,32 @@ export default function ChatBox() {
           {
             id: generateMessageId(),
             text: `Voici les ateliers de ${organizer} :`,
+            sender: "bot",
+          },
+        ]);
+        return;
+      }
+
+      if ((selectedMainTopic === "Conférence" || selectedMainTopic === "Table ronde") && !selectedConferenceDate) {
+        const selectedDate = choice.value;
+        setSelectedConferenceDate(selectedDate);
+        const filteredEvents = conferencesList.filter(
+          (event) => event.eventDate === selectedDate,
+        );
+        setConferenceChoices(
+          filteredEvents.map((event, index) => ({
+            choiceId: index,
+            label: `${event.title} (${event.startTime})`,
+            value: event.eventId,
+          })),
+        );
+        setConferenceQuestionLabel(`Choisissez une ${selectedMainTopic.toLowerCase()} :`);
+        setShowConferenceQuestion(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            text: `Voici les ${selectedMainTopic.toLowerCase()}s du ${formatFrenchDate(selectedDate)} :`,
             sender: "bot",
           },
         ]);
