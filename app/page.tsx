@@ -976,7 +976,7 @@ export default function ChatBox() {
         const infoOptions: QuestionChoice[] = [
           { choiceId: 1, label: "FAQ", value: "faq" },
           { choiceId: 2, label: "Billeterie", value: "billeterie" },
-          { choiceId: 3, label: "Food court", value: "foodcourt" },
+          { choiceId: 3, label: "Food Court", value: "foodcourt" },
           { choiceId: 4, label: "Où est l'organisateur", value: "organisateur" },
         ];
         setInfoChoices(infoOptions);
