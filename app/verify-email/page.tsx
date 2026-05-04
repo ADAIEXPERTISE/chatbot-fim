@@ -88,8 +88,7 @@ function VerifyEmailContent() {
   const code = digits.join("");
 
   return (
-    <div className="bg-white w-full max-w-lg rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
-
+    <div className="bg-white w-full max-w-md rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
       {/* En-tête */}
       <div className="px-10 pt-10 pb-6 border-b border-zinc-100"> 
 
@@ -102,7 +101,7 @@ function VerifyEmailContent() {
       {/* Corps */}
       <div className="px-10 py-10">
         {/* 6 cases OTP */}
-        <div className="flex gap-3 justify-center mb-8" onPaste={handlePaste}>
+        <div className="flex gap-1 justify-center mb-8" onPaste={handlePaste}>
           {digits.map((digit, i) => (
             <input
               key={i}

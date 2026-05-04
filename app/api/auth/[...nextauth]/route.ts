@@ -166,143 +166,152 @@
 // export { handler as GET, handler as POST };
 // app/api/auth/[...nextauth]/route.ts
 
-import NextAuth, { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import CredentialsProvider from "next-auth/providers/credentials";
-import mysql from "mysql2/promise";
-import bcrypt from "bcryptjs";
-import { dbConfig } from "@/lib/db";
+// import NextAuth, { NextAuthOptions } from "next-auth";
+// import GoogleProvider from "next-auth/providers/google";
+// import CredentialsProvider from "next-auth/providers/credentials";
+// import mysql from "mysql2/promise";
+// import bcrypt from "bcryptjs";
+// import { dbConfig } from "@/lib/db";
 
-type VisitorRow = {
-  visitor_id: string;
-  display_name: string | null;
-  email: string;
-  password: string | null;
-  phone: string | null;
-  role: "visiteur" | "exposant" | "staff" | "admin";
-};
+// type VisitorRow = {
+//   visitor_id: string;
+//   display_name: string | null;
+//   email: string;
+//   password: string | null;
+//   phone: string | null;
+//   role: "visiteur" | "exposant" | "staff" | "admin";
+// };
 
-export const authOptions: NextAuthOptions = {
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-    CredentialsProvider({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Mot de passe", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email et mot de passe requis.");
-        }
+// export const authOptions: NextAuthOptions = {
+//   providers: [
+//     GoogleProvider({
+//       clientId: process.env.GOOGLE_CLIENT_ID!,
+//       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+//     }),
+//     CredentialsProvider({
+//       name: "credentials",
+//       credentials: {
+//         email: { label: "Email", type: "email" },
+//         password: { label: "Mot de passe", type: "password" },
+//       },
+//       async authorize(credentials) {
+//         if (!credentials?.email || !credentials?.password) {
+//           throw new Error("Email et mot de passe requis.");
+//         }
 
-        const connection = await mysql.createConnection(dbConfig);
-        try {
-          const [rows] = await connection.execute<mysql.RowDataPacket[]>(
-            "SELECT * FROM visitor WHERE email = ? LIMIT 1",
-            [credentials.email]
-          );
+//         const connection = await mysql.createConnection(dbConfig);
+//         try {
+//           const [rows] = await connection.execute<mysql.RowDataPacket[]>(
+//             "SELECT * FROM visitor WHERE email = ? LIMIT 1",
+//             [credentials.email]
+//           );
 
-          const user = rows[0] as VisitorRow | undefined;
+//           const user = rows[0] as VisitorRow | undefined;
 
-          if (!user) throw new Error("Aucun compte trouvé avec cet email.");
-          if (!user.password)
-            throw new Error("Ce compte utilise la connexion Google. Clique sur 'Continuer avec Google'.");
+//           if (!user) throw new Error("Aucun compte trouvé avec cet email.");
+//           if (!user.password)
+//             throw new Error("Ce compte utilise la connexion Google. Clique sur 'Continuer avec Google'.");
 
-          const passwordOk = await bcrypt.compare(credentials.password, user.password);
-          if (!passwordOk) throw new Error("Mot de passe incorrect.");
+//           const passwordOk = await bcrypt.compare(credentials.password, user.password);
+//           if (!passwordOk) throw new Error("Mot de passe incorrect.");
 
-          return {
-            id: user.visitor_id,
-            name: user.display_name ?? user.email,
-            email: user.email,
-            role: user.role,
-          };
-        } finally {
-          await connection.end();
-        }
-      },
-    }),
-  ],
+//           return {
+//             id: user.visitor_id,
+//             name: user.display_name ?? user.email,
+//             email: user.email,
+//             role: user.role,
+//           };
+//         } finally {
+//           await connection.end();
+//         }
+//       },
+//     }),
+//   ],
 
-  callbacks: {
-    async signIn({ user, account }) {
-      if (account?.provider !== "google") return true;
+//   callbacks: {
+//     async signIn({ user, account }) {
+//       if (account?.provider !== "google") return true;
 
-      const connection = await mysql.createConnection(dbConfig);
-      try {
-        const [rows] = await connection.execute<mysql.RowDataPacket[]>(
-          "SELECT visitor_id FROM visitor WHERE email = ? LIMIT 1",
-          [user.email]
-        );
+//       const connection = await mysql.createConnection(dbConfig);
+//       try {
+//         const [rows] = await connection.execute<mysql.RowDataPacket[]>(
+//           "SELECT visitor_id FROM visitor WHERE email = ? LIMIT 1",
+//           [user.email]
+//         );
 
-        if (rows.length === 0) {
-          await connection.execute(
-            `INSERT INTO visitor (visitor_id, display_name, email, role)
-             VALUES (?, ?, ?, 'visiteur')`,
-            [crypto.randomUUID(), user.name ?? null, user.email]
-          );
-        }
-        return true;
-      } catch (error) {
-        console.error("Erreur signIn Google :", error);
-        return false;
-      } finally {
-        await connection.end();
-      }
-    },
+//         if (rows.length === 0) {
+//           await connection.execute(
+//             `INSERT INTO visitor (visitor_id, display_name, email, role)
+//              VALUES (?, ?, ?, 'visiteur')`,
+//             [crypto.randomUUID(), user.name ?? null, user.email]
+//           );
+//         }
+//         return true;
+//       } catch (error) {
+//         console.error("Erreur signIn Google :", error);
+//         return false;
+//       } finally {
+//         await connection.end();
+//       }
+//     },
 
-    async jwt({ token, user, account }) {
-      if (user) {
-        token.id = user.id;
-        token.role = (user as any).role ?? "visiteur";
-        token.name = user.name;
-      }
+//     async jwt({ token, user, account }) {
+//       if (user) {
+//         token.id = user.id;
+//         token.role = (user as any).role ?? "visiteur";
+//         token.name = user.name;
+//       }
 
-      if (!token.id && token.email) {
-        const connection = await mysql.createConnection(dbConfig);
-        try {
-          const [rows] = await connection.execute<mysql.RowDataPacket[]>(
-            "SELECT visitor_id, role, display_name FROM visitor WHERE email = ? LIMIT 1",
-            [token.email]
-          );
-          const visitor = rows[0] as VisitorRow | undefined;
-          if (visitor) {
-            token.id = visitor.visitor_id;
-            token.role = visitor.role;
-            token.name = visitor.display_name ?? token.name;
-          }
-        } finally {
-          await connection.end();
-        }
-      }
-      return token;
-    },
+//       if (!token.id && token.email) {
+//         const connection = await mysql.createConnection(dbConfig);
+//         try {
+//           const [rows] = await connection.execute<mysql.RowDataPacket[]>(
+//             "SELECT visitor_id, role, display_name FROM visitor WHERE email = ? LIMIT 1",
+//             [token.email]
+//           );
+//           const visitor = rows[0] as VisitorRow | undefined;
+//           if (visitor) {
+//             token.id = visitor.visitor_id;
+//             token.role = visitor.role;
+//             token.name = visitor.display_name ?? token.name;
+//           }
+//         } finally {
+//           await connection.end();
+//         }
+//       }
+//       return token;
+//     },
 
-    async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).id = token.id;
-        (session.user as any).role = token.role;
-      }
-      return session;
-    },
-  },
+//     async session({ session, token }) {
+//       if (session.user) {
+//         (session.user as any).id = token.id;
+//         (session.user as any).role = token.role;
+//       }
+//       return session;
+//     },
+//   },
 
-  pages: {
-    signIn: "/login",
-    error: "/login",
-  },
+//   pages: {
+//     signIn: "/login",
+//     error: "/login",
+//   },
 
-  session: {
-    strategy: "jwt",
-    maxAge: 60 * 60 * 24 * 7,
-  },
+//   session: {
+//     strategy: "jwt",
+//     maxAge: 60 * 60 * 24 * 7,
+//   },
 
-  secret: process.env.NEXTAUTH_SECRET,
-};
+//   secret: process.env.NEXTAUTH_SECRET,
+// };
+
+// const handler = NextAuth(authOptions);
+// export { handler as GET, handler as POST };
+
+
+import NextAuth from "next-auth";
+import {authOptions} from "@/lib/authOptions";
+
 
 const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
+
+export { handler as GET, handler as POST}

@@ -46,7 +46,7 @@ function SetPasswordContent() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Erreur serveur.");
-      router.push("/ai-message");
+      router.push("/login");
     } catch (err: unknown) {
       setStatus("error");
       setErrorMsg(err instanceof Error ? err.message : "Erreur inconnue.");

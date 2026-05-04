@@ -1,5 +1,7 @@
 "use client";
 
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
 type QuestionType = "text" | "choice" | "multi" | "scale" | "rating";
@@ -134,6 +136,21 @@ export default function SatisfactionPage() {
   const handleGoBack = () => {
     window.location.href = "/";
   };
+
+
+  //Gestion des sessions
+  const { data: session, status } = useSession();
+  const router = useRouter();
+    useEffect(() => {
+      if (status === "loading") return;
+  
+      if (!session?.user) {
+        router.push("/login");
+      } else {
+        console.log(session);
+      }
+    }, [status, session, router]); 
+
 
   useEffect(() => {
     const fetchQuestions = async () => {

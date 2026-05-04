@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {  useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import InputChatbox from "./chat/component/InputChatbox";
 import HeaderChatBox from "./chat/component/HeaderChatbox";
 import TypingBubble from "./chat/component/TypingBubble";
 import ChoiceButtons from "./chat/component/ChoiceButtons";
+import { signOut } from "next-auth/react";
 import {
   guidedQuestions,
   QuestionChoice,
   GuidedQuestion,
 } from "./chat/data/questions";
+import { useSession } from "next-auth/react";
 
 type Message = {
   id: number;
@@ -1218,10 +1220,11 @@ export default function ChatBox() {
     setSelectedExhibitorForModal(null);
   };
 
-  const handleFinishVisit = () => {
-    setShowContinueChoiceModal(false);
-    window.location.href = "/survey";
-  };
+ const handleFinishVisit = async () => {
+  setShowContinueChoiceModal(false);
+  await signOut({ redirect: false }); 
+  window.location.href = "/survey";
+};
 
   const typeMessage = (text: string, messageId: number) => {
     let index = 0;
@@ -1255,15 +1258,23 @@ export default function ChatBox() {
     prevMessagesLength.current = messages.length;
   }, [messages]);
 
-  // const isAuthenticated = false; 
-  
-  // if (!isAuthenticated) {
-  //   redirect("/login");
-  // } 
+
+  //Ggestion des sessions 
+  const { data: session, status } = useSession();
+
+  useEffect(() => {
+    if (status === "loading") return;
+
+    if (!session?.user) {
+      router.push("/login");
+    } else {
+      console.log(session);
+    }
+  }, [status, session, router]);
 
   return (
     <div className="flex h-screen flex-col bg-zinc-50 p-2 rounded-lg font-sans dark:bg-[#F2F0EF]">
-      <main className="flex flex-1 w-full flex-col bg-white dark:bg-white max-w-4xl mx-auto shadow-sm overflow-hidden rounded-lg">
+      <main className="flex flex-1 w-full flex-col bg-white dark:bg-white max-w-md mx-auto shadow-sm overflow-hidden rounded-lg">
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* --- MESSENGER STYLE HEADER --- */}
           <HeaderChatBox
@@ -1295,7 +1306,6 @@ export default function ChatBox() {
               )}
             </div>
           ))}
-
           <div ref={messagesEndRef} />
         </div>
         {/* INPUT BOX */}

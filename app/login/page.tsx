@@ -1,33 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { signIn, useSession } from "next-auth/react";
 
 type FormData = {
   email: string;
   password: string;
 };
-
-// ─── Helper : stocke les infos user dans localStorage ────────────────────────
-function saveUserToLocalStorage(user: {
-  id: string;
-  name: string | null | undefined;
-  email: string | null | undefined;
-  role: string | undefined;
-}) {
-  localStorage.setItem(
-    "user",
-    JSON.stringify({
-      id: user.id,
-      name: user.name ?? "",
-      email: user.email ?? "",
-      role: user.role ?? "visiteur",
-    }),
-  );
-}
-
-// ─── Composant principal ──────────────────────────────────────────────────────
 
 export default function Login() {
   const router = useRouter();
@@ -42,76 +22,87 @@ export default function Login() {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  // ── Connexion email + mot de passe ─────────────────────────────────────────
-  // async function handleSubmit(e: React.FormEvent) {
-  //   e.preventDefault();
-  //   setStatus("loading");
-  //   setErrorMessage("");
+// In handleSubmit (client side)
+// async function handleSubmit(e: React.FormEvent) {
+//   e.preventDefault();
+//   setStatus("loading");
+//   setErrorMessage("");
 
-  //   const result = await signIn("credentials", {
-  //     email   : form.email,
-  //     password: form.password,
-  //     redirect: false,
-  //   });
+//   const result = await signIn("credentials", {
+//     email: form.email,       
+//     password: form.password,
+//     redirect: false,
+//   });
 
-  //   if (result?.error) {
-  //     setStatus("error");
-  //     const errorMap: Record<string, string> = {
-  //       "Aucun compte trouvé avec cet email."                                        : "Aucun compte trouvé avec cet email.",
-  //       "Mot de passe incorrect."                                                    : "Mot de passe incorrect.",
-  //       "Ce compte utilise la connexion Google. Clique sur 'Continuer avec Google'.": "Ce compte utilise la connexion Google.",
-  //       "Email et mot de passe requis."                                              : "Email et mot de passe requis.",
-  //       "CredentialsSignin"                                                          : "Email ou mot de passe incorrect.",
-  //     };
-  //     setErrorMessage(errorMap[result.error] ?? "Une erreur est survenue.");
-  //     return;
-  //   }
+//   if (result?.error) {
+//     setStatus("error");
+//     const errorMap: Record<string, string> = {
+//       EMAIL_NOT_FOUND:  "Aucun compte trouvé avec cet email.",
+//       WRONG_PASSWORD:   "Mot de passe incorrect.",
+//       USE_GOOGLE:       "Ce compte utilise la connexion Google.",
+//       MISSING_FIELDS:   "Email et mot de passe requis.",
+//       CredentialsSignin: "Email ou mot de passe incorrect.", // fallback
+//     };
+//     setErrorMessage(errorMap[result.error] ?? "Une erreur est survenue.");
+//   } else {
+//     setStatus("success");
+//   }
+// } 
 
-  // }
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus("loading");
-    setErrorMessage("");
+async function handleSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  setStatus("loading");
+  setErrorMessage("");
 
+  try {
     const result = await signIn("credentials", {
       email: form.email,
       password: form.password,
-      redirect: false, // On garde false pour gérer la redirection nous-mêmes
+      redirect: false,
     });
+
+    console.log("result:", result); // ← check browser console
 
     if (result?.error) {
       setStatus("error");
       const errorMap: Record<string, string> = {
-        "Aucun compte trouvé avec cet email.":
-          "Aucun compte trouvé avec cet email.",
-        "Mot de passe incorrect.": "Mot de passe incorrect.",
-        "Ce compte utilise la connexion Google. Clique sur 'Continuer avec Google'.":
-          "Ce compte utilise la connexion Google.",
-        "Email et mot de passe requis.": "Email et mot de passe requis.",
+        MISSING_FIELDS:    "Email et mot de passe requis.",
+        EMAIL_NOT_FOUND:   "Aucun compte trouvé avec cet email.",
+        USE_GOOGLE:        "Ce compte utilise la connexion Google.",
+        WRONG_PASSWORD:    "Mot de passe incorrect.",
         CredentialsSignin: "Email ou mot de passe incorrect.",
       };
       setErrorMessage(errorMap[result.error] ?? "Une erreur est survenue.");
     } else {
-      // ✅ AJOUTE CETTE LOGIQUE ICI
       setStatus("success");
-      router.push("/"); // Redirige vers la page d'accueil
-      router.refresh(); // Rafraîchit les données pour que le middleware voie la session
     }
+  } catch (err) {
+    console.error("signIn threw:", err); // ← check browser console
+    setStatus("error");
+    setErrorMessage("Une erreur est survenue.");
   }
+}
 
-  // ── Connexion Google ────────────────────────────────────────────────────────
-  // Pour Google, la session est disponible via useSession() côté client
-  // après la redirection — on stocke depuis la page d'arrivée (/ai-message)
   async function handleGoogle() {
     setStatus("loading");
     await signIn("google", { callbackUrl: "/" });
   }
 
+  //Gestion des sessions
+  const { data: session, status: sessionStatus } = useSession();
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+
+    if (session) {
+      router.replace("/");
+    }
+  }, [session, sessionStatus, router]);
+ 
   return (
-    <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
+    <div className="min-h-screen bg-zinc-50 grid place-items-center p-4">
+      <div className="bg-white w-full flex items-center justify-center flex-col max-w-lg rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
         {/* En-tête */}
-        <div className="px-10 pt-10 pb-6 border-b border-zinc-100">
+        <div className="px-10 pt-10 pb-6 border-b border-zinc-100 w-full">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
             Connexion
           </h1>
@@ -121,7 +112,7 @@ export default function Login() {
         </div>
 
         {/* Corps */}
-        <div className="px-10 py-8">
+        <div className="px-10 py-8 w-full">
           {/* Bouton Google */}
           <button
             type="button"
@@ -259,8 +250,8 @@ export default function Login() {
         </div>
 
         {/* Pied de page */}
-        <div className="px-10 py-5 border-t border-zinc-100 bg-zinc-50/60 flex items-center justify-between">
-          {/* <p className="text-xs text-zinc-400">
+        <div className="px-10 py-5 border-t border-zinc-100 bg-zinc-50/60 flex items-center justify-between ">
+          <p className="text-xs text-zinc-400 w-1/2">
             Pas de compte ?{" "}
             <a
               href="/signup"
@@ -268,8 +259,8 @@ export default function Login() {
             >
               Créer un compte
             </a>
-          </p> */}
-          <p className="text-xs text-zinc-300">
+          </p>
+          <p className="text-xs text-zinc-300 flex items-end justify-end flex-col w-1/2">
             <a href="/terms" className="hover:text-zinc-500 transition-colors">
               CGU
             </a>
