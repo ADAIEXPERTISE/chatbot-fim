@@ -147,6 +147,8 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 // ─── Types (logique collègue) ─────────────────────────────────────────────────
 
@@ -208,6 +210,19 @@ export default function SatisfactionPage() {
   const progressValue =
     filtered.length > 0 ? ((currentStep + 1) / filtered.length) * 100 : 0;
 
+  //Gestion des sessions
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  useEffect(() => {
+    if (status === "loading") return;
+
+    if (!session?.user) {
+      router.push("/signup");
+    } else {
+      console.log(session);
+    }
+  }, [status, session, router]);
+  
   // ── Fetch questions depuis l'API ───────────────────────────────────────────
   useEffect(() => {
     (async () => {

@@ -145,7 +145,7 @@ export default function SatisfactionPage() {
       if (status === "loading") return;
   
       if (!session?.user) {
-        router.push("/login");
+        router.push("/signup");
       } else {
         console.log(session);
       }

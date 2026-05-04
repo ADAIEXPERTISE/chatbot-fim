@@ -1222,7 +1222,6 @@ export default function ChatBox() {
 
  const handleFinishVisit = async () => {
   setShowContinueChoiceModal(false);
-  await signOut({ redirect: false }); 
   window.location.href = "/survey";
 };
 
@@ -1266,7 +1265,7 @@ export default function ChatBox() {
     if (status === "loading") return;
 
     if (!session?.user) {
-      router.push("/login");
+      router.push("/signup");
     } else {
       console.log(session);
     }
@@ -1474,7 +1473,7 @@ export default function ChatBox() {
               </button>
               <button
                 onClick={handleFinishVisit}
-                className="rounded-lg bg-zinc-800 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 transition"
+                className="rounded-lg bg-zinc-800 px-4 py-3 text-sm font-medium text-white hover:bg-zinc-900 transition"
               >
                 Terminer
               </button>
