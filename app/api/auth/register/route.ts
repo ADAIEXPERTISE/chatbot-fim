@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   if (error) {
     console.error("Erreur Resend :", error);
     return NextResponse.json(
-      { success: false, message: error},
+      { success: false, message: error.message},
       { status: 500 }
     );
   }

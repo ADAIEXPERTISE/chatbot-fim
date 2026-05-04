@@ -41,8 +41,6 @@ export default function SignUpPage() {
 
       if (!res.ok) throw new Error(data.message || "Erreur serveur.");
 
-      // ✓ Email envoyé — on passe à la vérification OTP
-      // On passe l'email dans l'URL pour que la page suivante sache à qui envoyer
       router.push(`/verify-email?email=${encodeURIComponent(form.email)}`);
     } catch (err: unknown) {
       setStatus("error");

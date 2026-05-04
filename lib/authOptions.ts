@@ -130,12 +130,41 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
-    
+
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).role = token.role;
       }
       return session;
+    },
+    async signIn({ user, account }) {
+      if (account?.provider !== "google") return true;
+      try {
+        const [rows] = await pool.execute<any[]>(
+          "SELECT * FROM visitor WHERE email = ? LIMIT 1",
+          [user.email], // ✅ plain JS expression
+        );
+        const existingUser = rows[0];
+
+        if (!existingUser) {
+          await pool.execute(
+            `INSERT INTO visitor (display_name, email, role)
+         VALUES (?, ?, 'visiteur')`,
+            [user.name, user.email], // ✅
+          );
+        } else {
+          await pool.execute(
+            `UPDATE visitor
+         SET display_name = ?
+         WHERE email = ?`, // ✅ no trailing comma
+            [user.name, user.email],
+          );
+        }
+        return true;
+      } catch (error) {
+        console.error("[NextAuth signIn error]:", error);
+        return false;
+      }
     },
   },
 
