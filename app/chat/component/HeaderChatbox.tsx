@@ -27,7 +27,7 @@ export default function HeaderChatBox({ name, id, imageUrl }: AgentCardProps) {
         <Link href={"/"} className="text-lg font-bold text-gray-900">
           {name}
         </Link>
-        <p className="text-sm text-gray-500">Agent {id}</p>
+        {/* <p className="text-sm text-gray-500">Agent {id}</p> */}
       </div>
     </div>
   );

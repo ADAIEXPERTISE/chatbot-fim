@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Chatbot FIM 2026",
   description: "ceci est chatbot dédié à la FIM 2026",
+  icons: {
+    icon: "./lucid-origin_A_futuristic_AI_presence_non-physical_form._Abstract_energy_shape_subtle_glowing-3.jpg",
+  },
 };
 
 export default function RootLayout({
