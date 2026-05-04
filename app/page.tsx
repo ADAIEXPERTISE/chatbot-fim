@@ -41,6 +41,11 @@ type EventItem = {
   endTime: string;
   organizerOrBrand: string;
   targetAudience: string;
+  recrutementId?: number;
+  organisateur?: string;
+  orgEmail?: string;
+  orgTel?: string;
+  offres?: string;
 };
 
 type Answer = {
@@ -91,7 +96,8 @@ export default function ChatBox() {
   const [conferenceQuestionLabel, setConferenceQuestionLabel] = useState("Choisissez une conférence :");
   const [selectedAtelierOrganizer, setSelectedAtelierOrganizer] = useState<string | null>(null);
   const [selectedConferenceDate, setSelectedConferenceDate] = useState<string | null>(null);
-  const [conferencesList, setConferencesList] = useState<Array<{ eventId: string; title: string; startTime: string; endTime: string; venueName: string; eventDate: string; organizerOrBrand: string }>>([]);
+  const [selectedSpeedRecruitingOrganizer, setSelectedSpeedRecruitingOrganizer] = useState<string | null>(null);
+  const [conferencesList, setConferencesList] = useState<Array<{ eventId: string; title: string; startTime: string; endTime: string; venueName: string; eventDate: string; organizerOrBrand: string; recrutementId?: number; organisateur?: string; orgEmail?: string; orgTel?: string; offres?: string }>>([]);
   const [foodCourtChoices, setFoodCourtChoices] = useState<QuestionChoice[] | null>(null);
   const [showFoodCourtQuestion, setShowFoodCourtQuestion] = useState(false);
   const [foodCourtList, setFoodCourtList] = useState<Stand[]>([]);
@@ -115,6 +121,16 @@ export default function ChatBox() {
       month: "long",
       year: "numeric",
     }).format(date);
+  };
+
+  const formatFrenchTime = (timeString: string) => {
+    if (!timeString) return timeString;
+    const [hoursStr, minutesStr] = timeString.split(":");
+    const hours = Number(hoursStr);
+    const minutes = Number(minutesStr || "0");
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return timeString;
+    if (minutes === 0) return `${hours}h`;
+    return `${hours}h ${minutes}min`;
   };
 
   const keywordQuestion: GuidedQuestion | null = showKeywordQuestion
@@ -305,7 +321,12 @@ export default function ChatBox() {
           startTime: event.startTime,
           endTime: event.endTime,
           venueName: event.venueName,
-          organizerOrBrand: event.organizerOrBrand || "",
+          organizerOrBrand: event.organizerOrBrand || event.organisateur || "",
+          recrutementId: event.recrutementId,
+          organisateur: event.organisateur,
+          orgEmail: event.orgEmail,
+          orgTel: event.orgTel,
+          offres: event.offres,
         }));
 
         setConferencesList(normalizedEvents);
@@ -323,6 +344,7 @@ export default function ChatBox() {
           setConferenceQuestionLabel("Choisissez un organisateur :");
           setSelectedAtelierOrganizer(null);
           setSelectedConferenceDate(null);
+          setSelectedSpeedRecruitingOrganizer(null);
           setShowConferenceQuestion(true);
           setIsGuided(true);
           setMessages((prev) => [
@@ -330,6 +352,31 @@ export default function ChatBox() {
             {
               id: generateMessageId(),
               text: `Voici les organisateurs des ateliers :`,
+              sender: "bot",
+            },
+          ]);
+        } else if (eventType === "Speed recruiting") {
+          const organizerNames = Array.from(
+            new Set(normalizedEvents.map((event) => event.organizerOrBrand).filter(Boolean)),
+          );
+          setConferenceChoices(
+            organizerNames.map((organizer, index) => ({
+              choiceId: index,
+              label: organizer,
+              value: organizer,
+            })),
+          );
+          setConferenceQuestionLabel("Choisissez une organisation :");
+          setSelectedAtelierOrganizer(null);
+          setSelectedConferenceDate(null);
+          setSelectedSpeedRecruitingOrganizer(null);
+          setShowConferenceQuestion(true);
+          setIsGuided(true);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: generateMessageId(),
+              text: `Voici les organisations de Speed recruiting :`,
               sender: "bot",
             },
           ]);
@@ -347,6 +394,7 @@ export default function ChatBox() {
           setConferenceQuestionLabel("Choisissez une date :");
           setSelectedAtelierOrganizer(null);
           setSelectedConferenceDate(null);
+          setSelectedSpeedRecruitingOrganizer(null);
           setShowConferenceQuestion(true);
           setIsGuided(true);
           setMessages((prev) => [
@@ -368,6 +416,7 @@ export default function ChatBox() {
           setConferenceQuestionLabel("Choisissez une conférence :");
           setSelectedAtelierOrganizer(null);
           setSelectedConferenceDate(null);
+          setSelectedSpeedRecruitingOrganizer(null);
           setShowConferenceQuestion(true);
           setIsGuided(true);
           setMessages((prev) => [
@@ -888,6 +937,7 @@ export default function ChatBox() {
       setConferencesList([]);
       setSelectedAtelierOrganizer(null);
       setSelectedConferenceDate(null);
+      setSelectedSpeedRecruitingOrganizer(null);
       setCurrentQuestionIndex(0);
       setMessages((prev) => [
         ...prev,
@@ -1136,7 +1186,7 @@ export default function ChatBox() {
         setConferenceChoices(
           filteredEvents.map((event, index) => ({
             choiceId: index,
-            label: `${event.title} (${event.startTime})`,
+            label: `${event.title} (${formatFrenchTime(event.startTime)})`,
             value: event.eventId,
           })),
         );
@@ -1153,6 +1203,56 @@ export default function ChatBox() {
         return;
       }
 
+      if (selectedMainTopic === "Speed recruiting") {
+        const organization = choice.value;
+        // Permettre de changer d'organisateur
+        if (selectedSpeedRecruitingOrganizer !== organization) {
+          setSelectedSpeedRecruitingOrganizer(organization);
+          const speedRecruitingEvent = conferencesList.find(
+            (event) => event.organizerOrBrand === organization || event.organisateur === organization,
+          );
+
+          if (speedRecruitingEvent) {
+            let detailsText = `${speedRecruitingEvent.organisateur || organization}\n`;
+            const hasRecruitmentInfo = Boolean(
+              speedRecruitingEvent.orgTel ||
+              speedRecruitingEvent.orgEmail ||
+              speedRecruitingEvent.offres,
+            );
+
+            if (hasRecruitmentInfo) {
+              detailsText += `${'='.repeat(50)}\n\n`;
+
+              if (speedRecruitingEvent.orgTel) {
+                detailsText += `📞 Contact : ${speedRecruitingEvent.orgTel}\n`;
+              }
+              if (speedRecruitingEvent.orgEmail) {
+                detailsText += `📧 Email : ${speedRecruitingEvent.orgEmail}\n`;
+              }
+              if (speedRecruitingEvent.offres) {
+                detailsText += `\n💼 Offres d'emploi :\n${speedRecruitingEvent.offres}\n`;
+              }
+
+              detailsText += `\n${'='.repeat(50)}\n`;
+            }
+
+            detailsText += `📅 ${formatFrenchDate(speedRecruitingEvent.eventDate)}\n`;
+            detailsText += `🕐 ${formatFrenchTime(speedRecruitingEvent.startTime)} - ${formatFrenchTime(speedRecruitingEvent.endTime)}\n`;
+            detailsText += `📍 ${speedRecruitingEvent.venueName}`;
+
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: generateMessageId(),
+                text: detailsText,
+                sender: "bot",
+              },
+            ]);
+          }
+        }
+        return;
+      }
+
       if ((selectedMainTopic === "Conférence" || selectedMainTopic === "Table ronde") && !selectedConferenceDate) {
         const selectedDate = choice.value;
         setSelectedConferenceDate(selectedDate);
@@ -1162,7 +1262,7 @@ export default function ChatBox() {
         setConferenceChoices(
           filteredEvents.map((event, index) => ({
             choiceId: index,
-            label: `${event.title} (${event.startTime})`,
+            label: `${event.title} (${formatFrenchTime(event.startTime)})`,
             value: event.eventId,
           })),
         );
@@ -1188,7 +1288,7 @@ export default function ChatBox() {
           ...prev,
           {
             id: generateMessageId(),
-            text: `Détails de l'événement :\n${selectedConference.title}\nDate : ${formatFrenchDate(selectedConference.eventDate)}\nHeure : ${selectedConference.startTime} - ${selectedConference.endTime}\nLieu : ${selectedConference.venueName}\nOrganisateur : ${selectedConference.organizerOrBrand}`,
+            text: `Détails de l'événement :\n${selectedConference.title}\nDate : ${formatFrenchDate(selectedConference.eventDate)}\nHeure : ${formatFrenchTime(selectedConference.startTime)} - ${formatFrenchTime(selectedConference.endTime)}\nLieu : ${selectedConference.venueName}\nOrganisateur : ${selectedConference.organizerOrBrand}`,
             sender: "bot",
           },
         ]);
