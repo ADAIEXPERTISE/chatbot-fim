@@ -5,7 +5,7 @@ import { cookies }       from "next/headers";
 import pool              from "@/lib/db";
 
 export async function POST(req: Request) {
-  const { display_name, email, phone, role, company_name } = await req.json();
+  const { display_name, email, phone, role } = await req.json();
 
   /* ── 1. Validation ── */
   if (!display_name || !email || !role) {
@@ -29,14 +29,14 @@ export async function POST(req: Request) {
 
     /* ── 3. Insertion ── */
     const [result] = await pool.execute<any>(
-      `INSERT INTO visitor (display_name, email, phone, role, company_name)
-       VALUES (?, ?, ?, ?, ?)`,
-      [display_name, email, phone || null, role, company_name || null]
+      `INSERT INTO visitor (display_name, email, phone, role)
+       VALUES (?, ?, ?, ?)`,
+      [display_name, email, phone || null, role]
     );
 
     const userId = result.insertId as number;
 
-
+    /* ── 4. Création de la session NextAuth ── */
     const token = await encode({
       token: {
         sub:   String(userId),
@@ -45,9 +45,10 @@ export async function POST(req: Request) {
         role,
       },
       secret: process.env.NEXTAUTH_SECRET!,
-      maxAge: 60 * 60 * 8
+      maxAge: 60 * 60 * 8, // 8h — identique à authOptions
     });
 
+    // Nom du cookie selon l'environnement
     const cookieName =
       process.env.NODE_ENV === "production"
         ? "__Secure-next-auth.session-token"
@@ -66,6 +67,6 @@ export async function POST(req: Request) {
 
   } catch (err) {
     console.error("[register]", err);
-    return NextResponse.json({ message: err?.message || "Erreur serveur." }, { status: 500 });
+    return NextResponse.json({ message: "Erreur serveur." }, { status: 500 });
   }
 }

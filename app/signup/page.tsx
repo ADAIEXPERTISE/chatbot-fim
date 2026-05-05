@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Role = "exposant" | "professionnel" | "visiteur" | "";
@@ -10,7 +10,7 @@ type FormData = {
   phone: string;
   role: Role;
   company_name: string;
-  consent: boolean;   // 
+  consent: boolean; //
 };
 
 const ROLES: { value: Role; label: string }[] = [
@@ -68,6 +68,9 @@ export default function SignUpPage() {
     "h-11 w-full px-3 rounded-xl border border-zinc-200 bg-zinc-50 text-sm text-zinc-900 placeholder:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all";
   const labelCls =
     "text-[11px] font-medium text-zinc-400 uppercase tracking-wider";
+
+  const [mounted, setMounted] = useState(false); 
+  useEffect(() => setMounted(true), []); 
 
   return (
     <div className="min-h-screen bg-zinc-100 flex items-center justify-center p-4">
@@ -136,7 +139,12 @@ export default function SignUpPage() {
               }`}
             >
               <div className="flex flex-col gap-1.5">
-                <label className={labelCls}>Nom de {form.role === "professionnel" ? "l'entreprise" : "l'exposition"}</label>
+                <label className={labelCls}>
+                  Nom de{" "}
+                  {form.role === "professionnel"
+                    ? "l'entreprise"
+                    : "l'exposition"}
+                </label>
                 <input
                   name="company_name"
                   type="text"

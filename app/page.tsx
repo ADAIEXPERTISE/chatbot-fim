@@ -1493,6 +1493,7 @@ import HeaderChatBox from "./chat/component/HeaderChatbox";
 import TypingBubble from "./chat/component/TypingBubble";
 import ChoiceButtons from "./chat/component/ChoiceButtons";
 import { guidedQuestions, QuestionChoice, GuidedQuestion } from "./chat/data/questions";
+import { useSession } from "next-auth/react";
 
 type Message = {
   id: number;
@@ -1616,7 +1617,7 @@ export default function ChatBox() {
     const minutes = Number(minutesStr || "0");
     if (Number.isNaN(hours) || Number.isNaN(minutes)) return timeString;
     if (minutes === 0) return `${hours}h`;
-    return `${hours}h ${minutes}min`;
+    return `${hours}h${minutes}`;
   };
 
   const keywordQuestion: GuidedQuestion | null = showKeywordQuestion
@@ -2672,7 +2673,8 @@ export default function ChatBox() {
         setConferenceChoices(
           filteredEvents.map((event, index) => ({
             choiceId: index,
-            label: `${event.title} (${formatFrenchTime(event.startTime)})`,
+            label: `${event.title} `,
+            horaire: `Horaire: ${formatFrenchTime(event.startTime)}`,
             value: event.eventId,
           })),
         );
@@ -2707,24 +2709,24 @@ export default function ChatBox() {
             );
 
             if (hasRecruitmentInfo) {
-              detailsText += `${'='.repeat(50)}\n\n`;
+              detailsText += `${'='.repeat(20)}\n\n`;
 
               if (speedRecruitingEvent.orgTel) {
-                detailsText += `📞 Contact : ${speedRecruitingEvent.orgTel}\n`;
+                detailsText += `☎ Contact : ${speedRecruitingEvent.orgTel}\n`;
               }
               if (speedRecruitingEvent.orgEmail) {
-                detailsText += `📧 Email : ${speedRecruitingEvent.orgEmail}\n`;
+                detailsText += `✉ Email : ${speedRecruitingEvent.orgEmail}\n`;
               }
               if (speedRecruitingEvent.offres) {
-                detailsText += `\n💼 Offres d'emploi :\n${speedRecruitingEvent.offres}\n`;
+                detailsText += `\n 💼Offres d'emploi :\n${speedRecruitingEvent.offres}\n`;
               }
 
-              detailsText += `\n${'='.repeat(50)}\n`;
+              detailsText += `\n${'='.repeat(20)}\n`;
             }
 
-            detailsText += `📅 ${formatFrenchDate(speedRecruitingEvent.eventDate)}\n`;
-            detailsText += `🕐 ${formatFrenchTime(speedRecruitingEvent.startTime)} - ${formatFrenchTime(speedRecruitingEvent.endTime)}\n`;
-            detailsText += `📍 ${speedRecruitingEvent.venueName}`;
+            detailsText += `🗓 ${formatFrenchDate(speedRecruitingEvent.eventDate)}\n`;
+            detailsText += `⏱ ${formatFrenchTime(speedRecruitingEvent.startTime)} - ${formatFrenchTime(speedRecruitingEvent.endTime)}\n`;
+            detailsText += `🚩${speedRecruitingEvent.venueName}`;
 
             setMessages((prev) => [
               ...prev,
@@ -2748,7 +2750,8 @@ export default function ChatBox() {
         setConferenceChoices(
           filteredEvents.map((event, index) => ({
             choiceId: index,
-            label: `${event.title} (${formatFrenchTime(event.startTime)})`,
+            label: `${event.title}`,
+            horaire:`Horaire: ${formatFrenchTime(event.startTime)}`,
             value: event.eventId,
           })),
         );
@@ -2834,7 +2837,7 @@ export default function ChatBox() {
 
   const handleFinishVisit = () => {
     setShowContinueChoiceModal(false);
-    window.location.href = "/satisfaction";
+    window.location.href = "/survey";
   };
 
   const typeMessage = (text: string, messageId: number) => {
@@ -2856,6 +2859,32 @@ export default function ChatBox() {
       }
     }, 20); // speed (lower = faster)
   };
+  
+   const prevMessagesLength = useRef(messages.length);
+
+  useEffect(() => {
+    if (messages.length > prevMessagesLength.current) {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      });
+    }
+    prevMessagesLength.current = messages.length;
+  }, [messages]);
+
+
+  //Ggestion des sessions 
+  const { data: session, status } = useSession();
+
+  useEffect(() => {
+    if (status === "loading") return;
+
+    if (!session?.user) {
+      router.push("/signup");
+    } else {
+      console.log(session);
+    }
+  }, [status, session, router]);
 
   return (
     <div className="flex h-screen flex-col bg-zinc-50 p-2 rounded-lg font-sans dark:bg-[#F2F0EF]">
@@ -2928,8 +2957,8 @@ export default function ChatBox() {
 
       {/* EXHIBITOR MODAL */}
       {showExhibitorModal && selectedExhibitorForModal && (
-        <div className="fixed inset-0 bg- bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-white/80  flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg shadow-zinc-500  p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900">Détails de l'exposant</h2>
               <button
@@ -2985,7 +3014,7 @@ export default function ChatBox() {
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleShowExhibitorOnMap}
-                  className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
+                  className="flex-1 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-900 transition"
                 >
                   Voir sur la carte
                 </button>
@@ -3021,23 +3050,25 @@ export default function ChatBox() {
         </div>
       )}
 
-      {showContinueChoiceModal && (
-        <div className="fixed inset-0 bg-transparent bg-opacity-50 flex items-center justify-center z-50">
+    {showContinueChoiceModal && (
+        <div className="fixed inset-0 bg-white/70 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
-            <h2 className="text-xl font-semibold text-gray-900">Que souhaitez-vous faire ?</h2>
-            <p className="mt-3 text-gray-600">
-              Voulez-vous continuer la visite
-            </p>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {/* Que souhaitez-vous faire ? */}
+              Voulez-vous continuer la visite ?
+            </h2>
+            {/* <p className="mt-3 text-gray-600">
+            </p> */}
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <button
                 onClick={handleContinueVisit}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                className="rounded-lg border border-zinc-800 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
               >
                 Continuer la visite
               </button>
               <button
                 onClick={handleFinishVisit}
-                className="rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 transition"
+                className="rounded-lg bg-zinc-800 px-4 py-3 text-sm font-medium text-white hover:bg-zinc-900 transition"
               >
                 Terminer
               </button>
