@@ -367,7 +367,6 @@ export default function ChatBox() {
     try {
       const queryString = new URLSearchParams({
         type: eventType,
-        date: eventDate,
       }).toString();
       const res = await fetch(`/api/events?${queryString}`);
       const data = await res.json();
