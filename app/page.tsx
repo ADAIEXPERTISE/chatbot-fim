@@ -42,9 +42,9 @@ export default function ChatBox() {
   // prends les identifiants de robot
   const [currentAI, setCurrentAI] = useState<AgentCardProps | null>({
     id: 475,
-    name: "Wally FIM",
+    name: "Wally",
     description:
-      "Tri intelligent des e‑mails, synthèse des réunions, préparation des réponses, priorisation des actions, agenda augmenté.",
+      "Chatbot évènementiel",
     imageUrl: "/image/848c342a56e7854dec45b9349c21dfe5.gif",
     color: "shadow-green-500",
   });
@@ -81,7 +81,7 @@ export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      text: "Salut ! Je suis Wally FIM. Je vais commencer par quelques questions pour mieux connaître vos centres d'intérêt.",
+      text: "Salut ! Je suis Wally. Je vais commencer par quelques questions pour mieux connaître vos centres d'intérêt.",
       sender: "bot",
     },
     {
@@ -509,7 +509,7 @@ export default function ChatBox() {
 
   return (
     <div className="flex h-screen flex-col bg-zinc-50 p-2 rounded-lg font-sans dark:bg-[#F2F0EF]">
-      <main className="flex flex-1 w-full flex-col bg-white dark:bg-white max-w-4xl mx-auto shadow-sm overflow-hidden rounded-lg">
+      <main className="flex flex-1 w-full flex-col bg-white dark:bg-white max-w-sm mx-auto shadow-sm overflow-hidden rounded-lg">
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* --- MESSENGER STYLE HEADER --- */}
           <HeaderChatBox
@@ -555,7 +555,6 @@ export default function ChatBox() {
             <ChoiceButtons choices={currentQuestion.choices} onChoose={handleChooseOption} />
           </div>
         ) : null}
-
         <InputChatbox
           id={currentAI ? currentAI.id : 0}
           name={currentAI ? currentAI.name : "Robot"}

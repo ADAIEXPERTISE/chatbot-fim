@@ -29,9 +29,9 @@ export default function RecommendationBubble({
   }
 
   return (
-    <>
-      <div className="flex justify-start">
-        <div className="max-w-[80%] rounded-2xl px-4 py-2 text-sm bg-gray-200 text-gray-800 rounded-bl-none">
+    <div className="flex flex-col gap-1">
+      <div className="flex justify-start flex-col gap-2">
+        <div className="max-w-[45%] rounded-2xl px-4 py-2 text-sm bg-gray-200 text-gray-800 rounded-bl-none">
           Voici les stands qui pourraient vous intéresser :
         </div>
       </div>
@@ -64,6 +64,6 @@ export default function RecommendationBubble({
           ))}
         </div>
       </div>
-    </>
+    </div>
   );
 }

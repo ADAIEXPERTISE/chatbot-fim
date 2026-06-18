@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chatbot FIM 2026",
-  description: "ceci est chatbot dédié à la FIM 2026",
+  title: "Chatbot",
+  description: "Chatbot evenementiel",
 };
 
 export default function RootLayout({
